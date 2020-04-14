@@ -104,7 +104,7 @@ def do(name, download_dir):
 
 if __name__ == '__main__':
     name = sys.argv[1]
-    download_dir = sys.argv[2] if len(sys.argv) > 2 else os.getcwd()
+    download_dir = sys.argv[2] if len(sys.argv) > 2 else name
     os.makedirs(download_dir, exist_ok=True)
     cnt = 0
     for _ in do(name, download_dir):
