@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 import requests
 from tqdm import tqdm
 
@@ -57,7 +58,7 @@ def list_files(token, room_id):
     else:
         res.raise_for_status()
 
-def download_file(token, room_id, file_id, download_dir):
+def download_file(token, room_id, file_id, download_dir, append_prefix):
     res = requests.get(
             'https://api.chatwork.com/v2/rooms/{}/files/{}'.format(room_id, file_id),
             headers = {
@@ -69,7 +70,8 @@ def download_file(token, room_id, file_id, download_dir):
             }
     )
     data = res.json()
-    filename = data['filename']
+    prefix = datetime.fromtimestamp(int(data['upload_time'])).strftime('%Y%m%d%H%M%S') + '_'
+    filename = prefix + data['filename'] if append_prefix else data['filename']
     download_url = data['download_url']
     filepath = os.path.join(download_dir, filename)
     with open(filepath, 'wb') as f:
@@ -87,19 +89,22 @@ def do(name, download_dir):
     with open(os.path.join(download_dir, 'rooms.json'), 'w', encoding='utf-8') as f:
         json.dump(rooms, f)
     for room in tqdm(rooms):
-        room_id = room['room_id']
-        os.makedirs(os.path.join(download_dir, 'messages'), exist_ok=True)
-        with open(os.path.join(download_dir, 'messages', str(room_id) + '.json'), 'w', encoding='utf-8') as f:
-            json.dump(list_message(chatwork_token, room_id), f)
-            yield None
-        file_download_dir = os.path.join(download_dir, 'files', str(room_id))
-        os.makedirs(file_download_dir, exist_ok=True)
-        file_list = list_files(chatwork_token, room_id)
-        if file_list is None:
-            continue
-        for f in tqdm(file_list):
-            download_file(chatwork_token, room_id, f['file_id'], file_download_dir)
-            yield None
+        try:
+            room_id = room['room_id']
+            os.makedirs(os.path.join(download_dir, 'messages'), exist_ok=True)
+            with open(os.path.join(download_dir, 'messages', str(room_id) + '.json'), 'w', encoding='utf-8') as f:
+                json.dump(list_message(chatwork_token, room_id), f)
+                yield None
+            file_download_dir = os.path.join(download_dir, 'files', str(room_id))
+            os.makedirs(file_download_dir, exist_ok=True)
+            file_list = list_files(chatwork_token, room_id)
+            if file_list is None:
+                continue
+            for f in tqdm(file_list):
+                download_file(chatwork_token, room_id, f['file_id'], file_download_dir, True)
+                yield None
+        except:
+            pass
 
 
 if __name__ == '__main__':
